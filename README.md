@@ -17,9 +17,8 @@ This is a simple spaced repetition flashcard application for learning Japanese w
 python main.py
 ```
 
-3. Click **Study** to begin practicing the cards currently in the study deck.
-4. Click **Scan Files** to import or update cards from the markdown files.
-5. Click **New Day** to start a fresh study session which moves new and review cards into the study deck.
+3. Click the icons along the top of the window to **Study**, **Scan Files**, start a **New Day**, or **Quit** the program.
+4. During study, press **Space** to reveal the answer and **A**, **S**, **D**, or **F** to grade the card.
 
 Progress is stored in `flashcard_data.json`. To reset all progress, run:
 
