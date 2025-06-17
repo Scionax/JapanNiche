@@ -102,6 +102,7 @@ class StudyWidget(QWidget):
         layout.addWidget(self.pron_label)
         layout.addWidget(self.jp_label)
         layout.addWidget(self.hira_container)
+        layout.addStretch()
         layout.addWidget(self.show_btn)
         layout.addLayout(rating_layout)
         layout.addWidget(self.status_label)
@@ -176,7 +177,7 @@ class StudyWidget(QWidget):
 
         if direction == 'E2J':
             answer = jp
-            extra = en
+            extra = ''
         else:
             answer = en
             extra = ''
