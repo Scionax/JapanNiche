@@ -3,6 +3,20 @@ import json
 import random
 import datetime
 import re
+import sys
+from PyQt5.QtWidgets import (
+    QApplication,
+    QMainWindow,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QPushButton,
+    QLabel,
+    QMessageBox,
+    QStackedWidget,
+)
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont
 
 CONFIG_FILE = 'config.json'
 DATA_FILE = 'flashcard_data.json'
@@ -161,6 +175,7 @@ def rate_card(card):
 
 
 def study_session(data):
+    """CLI study session (retained for compatibility)."""
     if not data['study_deck']:
         print('No more cards!')
         return
@@ -179,7 +194,8 @@ def study_session(data):
     print('Study session complete!')
 
 
-def main():
+def cli_main():
+    """Run the legacy command line interface."""
     config = load_config()
     data = load_data()
     if not data['cards']:
@@ -203,5 +219,172 @@ def main():
             print('Invalid choice')
 
 
+class StudyWidget(QWidget):
+    """Widget used for the study session."""
+
+    def __init__(self, main_window):
+        super().__init__()
+        self.main_window = main_window
+        self.cid = None
+        self.card = None
+
+        self.front_label = QLabel()
+        self.front_label.setAlignment(Qt.AlignCenter)
+        self.front_label.setFont(QFont('Arial', 20))
+
+        self.back_label = QLabel()
+        self.back_label.setAlignment(Qt.AlignCenter)
+        self.back_label.setFont(QFont('Arial', 18))
+
+        self.show_btn = QPushButton('Show Answer')
+
+        rating_layout = QHBoxLayout()
+        self.btn_wrong = QPushButton('Wrong')
+        self.btn_unsure = QPushButton('Unsure')
+        self.btn_correct = QPushButton('Correct')
+        self.btn_easy = QPushButton('Easy')
+        for btn in (
+            self.btn_wrong,
+            self.btn_unsure,
+            self.btn_correct,
+            self.btn_easy,
+        ):
+            btn.setEnabled(False)
+            rating_layout.addWidget(btn)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.front_label)
+        layout.addWidget(self.back_label)
+        layout.addWidget(self.show_btn)
+        layout.addLayout(rating_layout)
+        self.setLayout(layout)
+
+        self.show_btn.clicked.connect(self.show_answer)
+        self.btn_wrong.clicked.connect(lambda: self.rate('A'))
+        self.btn_unsure.clicked.connect(lambda: self.rate('S'))
+        self.btn_correct.clicked.connect(lambda: self.rate('D'))
+        self.btn_easy.clicked.connect(lambda: self.rate('F'))
+
+    def start_session(self):
+        self.next_card()
+
+    def next_card(self):
+        if not self.main_window.data['study_deck']:
+            QMessageBox.information(self, 'Done', 'Study session complete!')
+            self.main_window.show_menu()
+            return
+        self.cid = random.choice(self.main_window.data['study_deck'])
+        self.card = self.main_window.data['cards'][self.cid]
+        self.front_label.setText(self.card['front'])
+        self.back_label.setText('')
+        self.show_btn.setEnabled(True)
+        for btn in (
+            self.btn_wrong,
+            self.btn_unsure,
+            self.btn_correct,
+            self.btn_easy,
+        ):
+            btn.setEnabled(False)
+
+    def show_answer(self):
+        self.back_label.setText(self.card['back'])
+        self.show_btn.setEnabled(False)
+        for btn in (
+            self.btn_wrong,
+            self.btn_unsure,
+            self.btn_correct,
+            self.btn_easy,
+        ):
+            btn.setEnabled(True)
+
+    def rate(self, rating):
+        card = self.card
+        card['ratings'].append(rating)
+        if len(card['ratings']) > 3:
+            card['ratings'].pop(0)
+        card['skill'] = sum(SCORE_MAP[x] for x in card['ratings'])
+        if rating == 'A':
+            card['struggle'] += 3
+        elif rating == 'S':
+            card['struggle'] += 1
+        card['last_study'] = datetime.datetime.now().timestamp()
+        if card['skill'] >= 2:
+            card['deck'] = 'review'
+            card['ratings'] = []
+            card['skill'] = 0
+            card['struggle'] = 0
+            self.main_window.data['study_deck'].remove(self.cid)
+        save_data(self.main_window.data)
+        self.next_card()
+
+
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.config = load_config()
+        self.data = load_data()
+        if not self.data['cards']:
+            scan_files(self.data)
+
+        self.setWindowTitle('Japanese Flashcards')
+
+        self.stack = QStackedWidget()
+        self.menu_widget = self.create_menu()
+        self.study_widget = StudyWidget(self)
+        self.stack.addWidget(self.menu_widget)
+        self.stack.addWidget(self.study_widget)
+        self.setCentralWidget(self.stack)
+
+    def create_menu(self):
+        widget = QWidget()
+        layout = QVBoxLayout()
+        layout.addStretch()
+        btn_study = QPushButton('Study')
+        btn_scan = QPushButton('Scan Files')
+        btn_new_day = QPushButton('New Day')
+        btn_quit = QPushButton('Quit')
+        for btn in (btn_study, btn_scan, btn_new_day, btn_quit):
+            btn.setMinimumHeight(40)
+            layout.addWidget(btn)
+        layout.addStretch()
+        widget.setLayout(layout)
+
+        btn_study.clicked.connect(self.start_study)
+        btn_scan.clicked.connect(self.scan_files)
+        btn_new_day.clicked.connect(self.new_day)
+        btn_quit.clicked.connect(self.close)
+        return widget
+
+    def show_menu(self):
+        self.stack.setCurrentWidget(self.menu_widget)
+
+    def start_study(self):
+        if not self.data['study_deck']:
+            QMessageBox.information(self, 'Study', 'No cards to study.')
+            return
+        self.study_widget.start_session()
+        self.stack.setCurrentWidget(self.study_widget)
+
+    def scan_files(self):
+        scan_files(self.data)
+        QMessageBox.information(self, 'Scan', 'Files scanned.')
+
+    def new_day(self):
+        start_new_day(self.data, self.config)
+        QMessageBox.information(
+            self,
+            'New Day',
+            f"Study deck now has {len(self.data['study_deck'])} cards.",
+        )
+
+
+def gui_main():
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.resize(500, 400)
+    window.show()
+    sys.exit(app.exec())
+
+
 if __name__ == '__main__':
-    main()
+    gui_main()
