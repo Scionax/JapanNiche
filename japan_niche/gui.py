@@ -27,15 +27,14 @@ class StudyWidget(QWidget):
 
         self.front_label = QLabel()
         self.front_label.setAlignment(Qt.AlignCenter)
-        self.front_label.setFont(QFont('Arial', 20))
+        self.front_label.setFont(QFont('Arial', 24))
 
-        self.orig_label = QLabel()
         self.desc_label = QLabel()
+        self.desc_label.setWordWrap(True)
         self.pron_label = QLabel()
         self.jp_label = QLabel()
         self.jp_pron_label = QLabel()
         for lbl in (
-            self.orig_label,
             self.desc_label,
             self.pron_label,
             self.jp_label,
@@ -44,8 +43,13 @@ class StudyWidget(QWidget):
             lbl.setAlignment(Qt.AlignCenter)
             lbl.setFont(QFont('Arial', 16))
 
+        self.desc_label.setFont(QFont('Arial', 18))
+        self.pron_label.setFont(QFont('Arial', 16))
+        self.jp_label.setFont(QFont('Arial', 24))
+        self.jp_pron_label.setFont(QFont('Arial', 14))
+
         self.status_label = QLabel()
-        self.status_label.setAlignment(Qt.AlignCenter)
+        self.status_label.setAlignment(Qt.AlignRight)
         self.status_label.setFont(QFont('Arial', 12))
 
         self.show_btn = QPushButton('Show Answer')
@@ -66,15 +70,16 @@ class StudyWidget(QWidget):
 
         layout = QVBoxLayout()
         layout.addWidget(self.front_label)
-        layout.addWidget(self.orig_label)
         layout.addWidget(self.desc_label)
         layout.addWidget(self.pron_label)
         layout.addWidget(self.jp_label)
         layout.addWidget(self.jp_pron_label)
-        layout.addWidget(self.status_label)
         layout.addWidget(self.show_btn)
         layout.addLayout(rating_layout)
+        layout.addWidget(self.status_label)
         self.setLayout(layout)
+
+        self.setFocusPolicy(Qt.StrongFocus)
 
         self.show_btn.clicked.connect(self.show_answer)
         self.btn_wrong.clicked.connect(lambda: self.rate('A'))
@@ -84,6 +89,7 @@ class StudyWidget(QWidget):
 
     def start_session(self):
         self.next_card()
+        self.setFocus()
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Space and self.show_btn.isEnabled():
@@ -108,7 +114,6 @@ class StudyWidget(QWidget):
         self.card = self.main_window.data['cards'][self.cid]
         self.front_label.setText(self.card['front'])
         for lbl in (
-            self.orig_label,
             self.desc_label,
             self.pron_label,
             self.jp_label,
@@ -130,11 +135,9 @@ class StudyWidget(QWidget):
         jp = c.get('jp', c.get('front', ''))
         en = c.get('en', c.get('back', ''))
         pron = c.get('pron', '')
-        hira = c.get('hira', '')
-        self.orig_label.setText(jp)
         self.desc_label.setText(en)
-        self.pron_label.setText(pron)
-        self.jp_label.setText(hira)
+        self.pron_label.setText(f"[{pron}]")
+        self.jp_label.setText(jp)
         self.jp_pron_label.setText(pron.replace('-', ' '))
         self.status_label.setText(f"Score: {c['skill']}  Struggle: {c['struggle']}")
         self.show_btn.setEnabled(False)
@@ -164,6 +167,7 @@ class StudyWidget(QWidget):
             card['struggle'] = 0
             self.main_window.data['study_deck'].remove(self.cid)
         save_data(self.main_window.data)
+        self.main_window.update_counts()
         self.next_card()
 
 
@@ -184,29 +188,15 @@ class MainWindow(QWidget):
         self.stack.addWidget(self.study_widget)
 
         layout = QVBoxLayout()
+        self.toolbar_layout = self.create_toolbar()
+        layout.addLayout(self.toolbar_layout)
         layout.addWidget(self.stack)
         self.setLayout(layout)
+        self.update_counts()
 
     def create_menu(self):
         widget = QWidget()
         layout = QVBoxLayout()
-        toolbar = QHBoxLayout()
-
-        def tool(text, icon, slot):
-            btn = QToolButton()
-            btn.setText(text)
-            btn.setIcon(self.style().standardIcon(icon))
-            btn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
-            btn.clicked.connect(slot)
-            toolbar.addWidget(btn)
-            return btn
-
-        tool('Study', QStyle.SP_ArrowForward, self.start_study)
-        tool('Scan', QStyle.SP_BrowserReload, self.scan_files)
-        tool('New Day', QStyle.SP_FileDialogNewFolder, self.new_day)
-        tool('Quit', QStyle.SP_DialogCloseButton, self.close)
-
-        layout.addLayout(toolbar)
         layout.addStretch()
         widget.setLayout(layout)
         return widget
@@ -224,6 +214,7 @@ class MainWindow(QWidget):
     def scan_files(self):
         scan_files(self.data)
         QMessageBox.information(self, 'Scan', 'Files scanned.')
+        self.update_counts()
 
     def new_day(self):
         start_new_day(self.data, self.config)
@@ -232,4 +223,40 @@ class MainWindow(QWidget):
             'New Day',
             f"Study deck now has {len(self.data['study_deck'])} cards.",
         )
+        self.update_counts()
+
+    def create_toolbar(self):
+        layout = QHBoxLayout()
+
+        def tool(text, icon, slot):
+            btn = QToolButton()
+            btn.setText(text)
+            btn.setIcon(self.style().standardIcon(icon))
+            btn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+            btn.clicked.connect(slot)
+            layout.addWidget(btn)
+            return btn
+
+        tool('Study', QStyle.SP_ArrowForward, self.start_study)
+        tool('Scan', QStyle.SP_BrowserReload, self.scan_files)
+        tool('New Day', QStyle.SP_FileDialogNewFolder, self.new_day)
+        tool('Quit', QStyle.SP_DialogCloseButton, self.close)
+
+        layout.addStretch()
+        self.lbl_study = QLabel()
+        self.lbl_review = QLabel()
+        self.lbl_no = QLabel()
+        for lbl in (self.lbl_study, self.lbl_review, self.lbl_no):
+            layout.addWidget(lbl)
+        return layout
+
+    def update_counts(self):
+        counts = {'study': 0, 'review': 0, 'no_deck': 0}
+        for card in self.data['cards'].values():
+            deck = card.get('deck', 'no_deck')
+            if deck in counts:
+                counts[deck] += 1
+        self.lbl_study.setText(f"Study: {counts['study']}")
+        self.lbl_review.setText(f"Review: {counts['review']}")
+        self.lbl_no.setText(f"No Deck: {counts['no_deck']}")
 
