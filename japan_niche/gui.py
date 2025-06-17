@@ -127,11 +127,15 @@ class StudyWidget(QWidget):
 
     def show_answer(self):
         c = self.card
-        self.orig_label.setText(c['jp'])
-        self.desc_label.setText(c['en'])
-        self.pron_label.setText(c['pron'])
-        self.jp_label.setText(c['hira'])
-        self.jp_pron_label.setText(c['pron'].replace('-', ' '))
+        jp = c.get('jp', c.get('front', ''))
+        en = c.get('en', c.get('back', ''))
+        pron = c.get('pron', '')
+        hira = c.get('hira', '')
+        self.orig_label.setText(jp)
+        self.desc_label.setText(en)
+        self.pron_label.setText(pron)
+        self.jp_label.setText(hira)
+        self.jp_pron_label.setText(pron.replace('-', ' '))
         self.status_label.setText(f"Score: {c['skill']}  Struggle: {c['struggle']}")
         self.show_btn.setEnabled(False)
         for btn in (
@@ -192,6 +196,7 @@ class MainWindow(QWidget):
             btn = QToolButton()
             btn.setText(text)
             btn.setIcon(self.style().standardIcon(icon))
+            btn.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
             btn.clicked.connect(slot)
             toolbar.addWidget(btn)
             return btn
