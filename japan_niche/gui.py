@@ -45,8 +45,8 @@ class StudyWidget(QWidget):
 
         self.desc_label.setFont(QFont('Arial', 18))
         self.pron_label.setFont(QFont('Arial', 16))
-        self.jp_label.setFont(QFont('Arial', 24))
-        self.jp_pron_label.setFont(QFont('Arial', 14))
+        self.jp_label.setFont(QFont('Arial', 16))
+        self.jp_pron_label.setFont(QFont('Arial', 24))
 
         self.status_label = QLabel()
         self.status_label.setAlignment(Qt.AlignRight)
@@ -132,13 +132,23 @@ class StudyWidget(QWidget):
 
     def show_answer(self):
         c = self.card
-        jp = c.get('jp', c.get('front', ''))
-        en = c.get('en', c.get('back', ''))
+        direction = c.get('direction', 'J2E')
+        jp = c.get('jp', '')
+        en = c.get('en', '')
         pron = c.get('pron', '')
-        self.desc_label.setText(en)
+        hira = c.get('hira', '')
+
+        if direction == 'E2J':
+            answer = jp
+            extra = en
+        else:
+            answer = en
+            extra = ''
+
+        self.desc_label.setText(answer)
         self.pron_label.setText(f"[{pron}]")
-        self.jp_label.setText(jp)
-        self.jp_pron_label.setText(pron.replace('-', ' '))
+        self.jp_label.setText(extra)
+        self.jp_pron_label.setText(hira)
         self.status_label.setText(f"Score: {c['skill']}  Struggle: {c['struggle']}")
         self.show_btn.setEnabled(False)
         for btn in (
