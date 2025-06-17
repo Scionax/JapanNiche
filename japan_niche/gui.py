@@ -98,6 +98,7 @@ class StudyWidget(QWidget):
 
         layout = QVBoxLayout()
         layout.addWidget(self.front_label)
+        layout.addSpacing(16)
         layout.addWidget(self.desc_label)
         layout.addSpacing(16)
         layout.addWidget(self.pron_label)
