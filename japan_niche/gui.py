@@ -14,6 +14,29 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QFont
 from PyQt5.QtCore import Qt
 
+# Mapping of hiragana characters to their romanized pronunciations used for
+# displaying per-character readings on the reveal card.
+HIRAGANA_PRONUNCIATIONS = {
+    'あ': 'a', 'い': 'i', 'う': 'u', 'え': 'e', 'お': 'o',
+    'か': 'ka', 'き': 'ki', 'く': 'ku', 'け': 'ke', 'こ': 'ko',
+    'が': 'ga', 'ぎ': 'gi', 'ぐ': 'gu', 'げ': 'ge', 'ご': 'go',
+    'さ': 'sa', 'し': 'shi', 'す': 'su', 'せ': 'se', 'そ': 'so',
+    'ざ': 'za', 'じ': 'ji', 'ず': 'zu', 'ぜ': 'ze', 'ぞ': 'zo',
+    'た': 'ta', 'ち': 'chi', 'つ': 'tsu', 'て': 'te', 'と': 'to',
+    'だ': 'da', 'ぢ': 'ji', 'づ': 'zu', 'で': 'de', 'ど': 'do',
+    'な': 'na', 'に': 'ni', 'ぬ': 'nu', 'ね': 'ne', 'の': 'no',
+    'は': 'ha', 'ひ': 'hi', 'ふ': 'fu', 'へ': 'he', 'ほ': 'ho',
+    'ば': 'ba', 'び': 'bi', 'ぶ': 'bu', 'べ': 'be', 'ぼ': 'bo',
+    'ぱ': 'pa', 'ぴ': 'pi', 'ぷ': 'pu', 'ぺ': 'pe', 'ぽ': 'po',
+    'ま': 'ma', 'み': 'mi', 'む': 'mu', 'め': 'me', 'も': 'mo',
+    'や': 'ya', 'ゆ': 'yu', 'よ': 'yo',
+    'ら': 'ra', 'り': 'ri', 'る': 'ru', 'れ': 're', 'ろ': 'ro',
+    'わ': 'wa', 'を': 'wo', 'ん': 'n',
+    'ゃ': 'ya', 'ゅ': 'yu', 'ょ': 'yo',
+    'っ': 'tsu', 'ゎ': 'wa',
+    'ー': '-',
+}
+
 from .data import load_config, load_data, save_data
 from .cards import scan_files, start_new_day, SCORE_MAP
 
@@ -33,12 +56,10 @@ class StudyWidget(QWidget):
         self.desc_label.setWordWrap(True)
         self.pron_label = QLabel()
         self.jp_label = QLabel()
-        self.jp_pron_label = QLabel()
         for lbl in (
             self.desc_label,
             self.pron_label,
             self.jp_label,
-            self.jp_pron_label,
         ):
             lbl.setAlignment(Qt.AlignCenter)
             lbl.setFont(QFont('Arial', 16))
@@ -46,7 +67,14 @@ class StudyWidget(QWidget):
         self.desc_label.setFont(QFont('Arial', 18))
         self.pron_label.setFont(QFont('Arial', 16))
         self.jp_label.setFont(QFont('Arial', 16))
-        self.jp_pron_label.setFont(QFont('Arial', 24))
+
+        # Container used to display hiragana characters with their romanized
+        # readings underneath each character when revealing a card.
+        self.hira_layout = QHBoxLayout()
+        self.hira_layout.setAlignment(Qt.AlignCenter)
+        self.hira_layout.setSpacing(8)
+        self.hira_container = QWidget()
+        self.hira_container.setLayout(self.hira_layout)
 
         self.status_label = QLabel()
         self.status_label.setAlignment(Qt.AlignRight)
@@ -73,7 +101,7 @@ class StudyWidget(QWidget):
         layout.addWidget(self.desc_label)
         layout.addWidget(self.pron_label)
         layout.addWidget(self.jp_label)
-        layout.addWidget(self.jp_pron_label)
+        layout.addWidget(self.hira_container)
         layout.addWidget(self.show_btn)
         layout.addLayout(rating_layout)
         layout.addWidget(self.status_label)
@@ -86,6 +114,14 @@ class StudyWidget(QWidget):
         self.btn_unsure.clicked.connect(lambda: self.rate('S'))
         self.btn_correct.clicked.connect(lambda: self.rate('D'))
         self.btn_easy.clicked.connect(lambda: self.rate('F'))
+
+    def _clear_hira_layout(self):
+        """Remove all widgets from the hiragana display layout."""
+        while self.hira_layout.count():
+            item = self.hira_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
 
     def start_session(self):
         self.next_card()
@@ -117,10 +153,10 @@ class StudyWidget(QWidget):
             self.desc_label,
             self.pron_label,
             self.jp_label,
-            self.jp_pron_label,
             self.status_label,
         ):
             lbl.setText('')
+        self._clear_hira_layout()
         self.show_btn.setEnabled(True)
         for btn in (
             self.btn_wrong,
@@ -148,8 +184,31 @@ class StudyWidget(QWidget):
         self.desc_label.setText(answer)
         self.pron_label.setText(f"[{pron}]")
         self.jp_label.setText(extra)
-        self.jp_pron_label.setText(hira)
-        self.status_label.setText(f"Score: {c['skill']}  Struggle: {c['struggle']}")
+        self._clear_hira_layout()
+        for char in hira:
+            char_lbl = QLabel(char)
+            char_lbl.setAlignment(Qt.AlignHCenter)
+            char_lbl.setFont(QFont('Arial', 32))
+
+            roman = HIRAGANA_PRONUNCIATIONS.get(char, char)
+            roman_lbl = QLabel(roman)
+            roman_lbl.setAlignment(Qt.AlignHCenter)
+            roman_lbl.setFont(QFont('Arial', 14))
+            roman_lbl.setStyleSheet('color: gray')
+
+            vbox = QVBoxLayout()
+            vbox.setSpacing(12)
+            vbox.setContentsMargins(0, 0, 0, 0)
+            vbox.addWidget(char_lbl)
+            vbox.addWidget(roman_lbl)
+
+            w = QWidget()
+            w.setLayout(vbox)
+            self.hira_layout.addWidget(w)
+
+        self.status_label.setText(
+            f"Score: {c['skill']}  Struggle: {c['struggle']}"
+        )
         self.show_btn.setEnabled(False)
         for btn in (
             self.btn_wrong,
