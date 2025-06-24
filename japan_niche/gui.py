@@ -47,6 +47,7 @@ class StudyWidget(QWidget):
         self.main_window = main_window
         self.cid = None
         self.card = None
+        self.direction = 'J2E'
 
         self.front_label = QLabel()
         self.front_label.setAlignment(Qt.AlignCenter)
@@ -152,7 +153,9 @@ class StudyWidget(QWidget):
             return
         self.cid = random.choice(self.main_window.data['study_deck'])
         self.card = self.main_window.data['cards'][self.cid]
-        self.front_label.setText(self.card['front'])
+        self.direction = random.choice(['J2E', 'E2J'])
+        front = self.card['jp'] if self.direction == 'J2E' else self.card['en']
+        self.front_label.setText(front)
         for lbl in (
             self.desc_label,
             self.pron_label,
@@ -172,7 +175,7 @@ class StudyWidget(QWidget):
 
     def show_answer(self):
         c = self.card
-        direction = c.get('direction', 'J2E')
+        direction = self.direction
         jp = c.get('jp', '')
         en = c.get('en', '')
         pron = c.get('pron', '')
@@ -211,7 +214,7 @@ class StudyWidget(QWidget):
             self.hira_layout.addWidget(w)
 
         self.status_label.setText(
-            f"Score: {c['skill']}  Struggle: {c['struggle']}"
+            f"Score: {c['skill'][direction]}  Struggle: {c['struggle'][direction]}"
         )
         self.show_btn.setEnabled(False)
         for btn in (
@@ -224,20 +227,21 @@ class StudyWidget(QWidget):
 
     def rate(self, rating):
         card = self.card
-        card['ratings'].append(rating)
-        if len(card['ratings']) > 3:
-            card['ratings'].pop(0)
-        card['skill'] = sum(SCORE_MAP[x] for x in card['ratings'])
+        dir_ = self.direction
+        card['ratings'][dir_].append(rating)
+        if len(card['ratings'][dir_]) > 3:
+            card['ratings'][dir_].pop(0)
+        card['skill'][dir_] = sum(SCORE_MAP[x] for x in card['ratings'][dir_])
         if rating == 'A':
-            card['struggle'] += 3
+            card['struggle'][dir_] += 3
         elif rating == 'S':
-            card['struggle'] += 1
-        card['last_study'] = datetime.datetime.now().timestamp()
-        if card['skill'] >= 2:
+            card['struggle'][dir_] += 1
+        card['last_study'][dir_] = datetime.datetime.now().timestamp()
+        if card['skill']['J2E'] >= 2 and card['skill']['E2J'] >= 2:
             card['deck'] = 'review'
-            card['ratings'] = []
-            card['skill'] = 0
-            card['struggle'] = 0
+            card['ratings'] = {'J2E': [], 'E2J': []}
+            card['skill'] = {'J2E': 0, 'E2J': 0}
+            card['struggle'] = {'J2E': 0, 'E2J': 0}
             self.main_window.data['study_deck'].remove(self.cid)
         save_data(self.main_window.data)
         self.main_window.update_counts()
