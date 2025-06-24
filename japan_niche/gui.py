@@ -151,9 +151,33 @@ class StudyWidget(QWidget):
             QMessageBox.information(self, 'Done', 'Study session complete!')
             self.main_window.show_menu()
             return
-        self.cid = random.choice(self.main_window.data['study_deck'])
-        self.card = self.main_window.data['cards'][self.cid]
-        self.direction = random.choice(['J2E', 'E2J'])
+        while True:
+            if not self.main_window.data['study_deck']:
+                QMessageBox.information(self, 'Done', 'Study session complete!')
+                self.main_window.show_menu()
+                return
+
+            self.cid = random.choice(self.main_window.data['study_deck'])
+            self.card = self.main_window.data['cards'][self.cid]
+
+            directions = [
+                d for d in ('J2E', 'E2J') if self.card['skill'].get(d, 0) < 2
+            ]
+
+            if directions:
+                self.direction = random.choice(directions)
+                break
+
+            # If no directions remain, the card is finished. Move to review and
+            # continue selecting another card.
+            self.card['deck'] = 'review'
+            self.card['ratings'] = {'J2E': [], 'E2J': []}
+            self.card['skill'] = {'J2E': 0, 'E2J': 0}
+            self.card['struggle'] = {'J2E': 0, 'E2J': 0}
+            self.main_window.data['study_deck'].remove(self.cid)
+            save_data(self.main_window.data)
+            self.main_window.update_counts()
+
         front = self.card['jp'] if self.direction == 'J2E' else self.card['en']
         self.front_label.setText(front)
         for lbl in (
