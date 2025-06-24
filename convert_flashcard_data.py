@@ -12,15 +12,20 @@ def convert():
     with open(DATA_FILE, 'r', encoding='utf-8') as f:
         data = json.load(f)
 
-    # Detect already converted format
+    # Detect already converted format by checking that cards use dict ratings
+    # and simple Japanese IDs (no `|` separator)
     sample = next(iter(data.get('cards', {}).values()), None)
-    if sample and isinstance(sample.get('ratings'), dict):
+    already_new = (
+        sample
+        and isinstance(sample.get('ratings'), dict)
+        and '|' not in sample.get('id', '')
+    )
+    if already_new:
         print('Data already in new format')
         return
 
     old_cards = data.get('cards', {})
     new_cards = {}
-    pair_map = {}
     id_map = {}
 
     for cid, card in old_cards.items():
@@ -29,17 +34,13 @@ def convert():
         pron = card.get('pron')
         hira = card.get('hira')
         direction = card.get('direction', 'J2E')
-        base_key = f"{jp}|{en}"
-        lst = pair_map.setdefault(base_key, [])
 
-        target = None
-        for c in lst:
-            if not c['ratings'][direction]:
-                target = c
-                break
+        if not jp:
+            continue
+
+        new_id = jp
+        target = new_cards.get(new_id)
         if target is None:
-            idx = len(lst)
-            new_id = base_key + ('*' * idx if idx else '')
             target = {
                 'id': new_id,
                 'jp': jp,
@@ -52,15 +53,21 @@ def convert():
                 'struggle': {'J2E': 0, 'E2J': 0},
                 'last_study': {'J2E': None, 'E2J': None},
             }
-            lst.append(target)
             new_cards[new_id] = target
+        else:
+            # Update details if present
+            for k, v in [('en', en), ('pron', pron), ('hira', hira)]:
+                if v:
+                    target[k] = v
+            if card.get('deck', 'no_deck') != 'no_deck':
+                target['deck'] = card['deck']
+
         target['ratings'][direction] = card.get('ratings', [])
         target['skill'][direction] = card.get('skill', 0)
         target['struggle'][direction] = card.get('struggle', 0)
         target['last_study'][direction] = card.get('last_study')
-        if card.get('deck', 'no_deck') != 'no_deck':
-            target['deck'] = card['deck']
-        id_map[cid] = target['id']
+
+        id_map[cid] = new_id
 
     new_study_deck = []
     for cid in data.get('study_deck', []):

@@ -26,7 +26,8 @@ def parse_markdown_files(existing_ids=None):
     for fname in os.listdir(FLASHCARD_DIR):
         if not fname.endswith('.md'):
             continue
-        with open(os.path.join(FLASHCARD_DIR, fname), 'r', encoding='utf-8') as f:
+        path = os.path.join(FLASHCARD_DIR, fname)
+        with open(path, 'r', encoding='utf-8') as f:
             for line in f:
                 line = line.strip()
                 if line.startswith('#'):
@@ -58,17 +59,34 @@ def parse_markdown_files(existing_ids=None):
 
 
 def scan_files(data):
-    """Read markdown files and merge cards into *data*."""
-    new_cards = parse_markdown_files(existing_ids=set(data['cards'].keys()))
+    """Read markdown files and synchronize cards with the markdown files."""
+    new_cards = parse_markdown_files()
+
+    matched = set()
     for cid, card in new_cards.items():
+        matched.add(cid)
         if cid not in data['cards']:
             data['cards'][cid] = card
         else:
             existing = data['cards'][cid]
             for k in ['jp', 'en', 'pron', 'hira']:
                 existing[k] = card[k]
+
+    removed = []
+    for cid in list(data['cards'].keys()):
+        if cid not in matched:
+            removed.append(cid)
+            data['cards'].pop(cid)
+            if cid in data['study_deck']:
+                data['study_deck'].remove(cid)
+
     save_data(data)
-    print(f"Imported {len(new_cards)} cards. Total cards: {len(data['cards'])}")
+    msg = (
+        f"Imported {len(new_cards)} cards. "
+        f"Total cards: {len(data['cards'])}. "
+        f"Removed {len(removed)} cards."
+    )
+    print(msg)
 
 
 def _total_struggle(card):
@@ -87,7 +105,9 @@ def select_review_cards(data, count):
 
 
 def select_new_cards(data, count):
-    no_deck = [c['id'] for c in data['cards'].values() if c['deck'] == 'no_deck']
+    no_deck = [
+        c['id'] for c in data['cards'].values() if c['deck'] == 'no_deck'
+    ]
     return no_deck[:count]
 
 
