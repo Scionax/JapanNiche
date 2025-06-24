@@ -20,7 +20,14 @@ python main.py
 3. Click the icons along the top of the window to **Study**, **Scan Files**, start a **New Day**, or **Quit** the program.
 4. During study, press **Space** to reveal the answer and **A**, **S**, **D**, or **F** to grade the card.
 
-Progress is stored in `flashcard_data.json`. To reset all progress, run:
+Progress is stored in `flashcard_data.json`. Older data files can be
+converted to the new unified format by running:
+
+```bash
+python convert_flashcard_data.py
+```
+
+To reset all progress, run:
 
 ```bash
 python reset_flashcards.py
