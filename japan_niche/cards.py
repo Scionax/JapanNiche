@@ -37,10 +37,10 @@ def parse_markdown_files(existing_ids=None):
                     if not m:
                         continue
                     jp, en, pron, hira = m.groups()
-                    base_id = f"{jp}|{en}"
-                    cid = base_id
-                    while cid in existing_ids or cid in cards:
-                        cid += '*'
+                    cid = jp
+                    if cid in existing_ids or cid in cards:
+                        print(f"Duplicate card id '{cid}' found in {fname}")
+                        continue
 
                     cards[cid] = {
                         'id': cid,
