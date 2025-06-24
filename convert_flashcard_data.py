@@ -12,14 +12,15 @@ def convert():
     with open(DATA_FILE, 'r', encoding='utf-8') as f:
         data = json.load(f)
 
-    # Detect already converted format by checking that cards use dict ratings
-    # and simple Japanese IDs (no `|` separator)
-    sample = next(iter(data.get('cards', {}).values()), None)
-    already_new = (
-        sample
-        and isinstance(sample.get('ratings'), dict)
-        and '|' not in sample.get('id', '')
-    )
+    # Detect already converted format by ensuring *all* cards have simple
+    # Japanese IDs (no `|` separator) and the ratings field is a dict. The
+    # previous implementation only looked at a single card which caused a
+    # mix of old and new formats to be incorrectly detected as converted.
+    already_new = True
+    for card in data.get('cards', {}).values():
+        if not isinstance(card.get('ratings'), dict) or '|' in card.get('id', ''):
+            already_new = False
+            break
     if already_new:
         print('Data already in new format')
         return
